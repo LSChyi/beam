@@ -1645,7 +1645,7 @@ def nlp_analyze_text():
 def sdf_basic_example():
   import os
   from apache_beam.io.restriction_trackers import OffsetRange
-  read_next_record = None
+  read_next_record = lambda f: f.readline() # Assume one line per record.
 
   # [START SDF_BasicExample]
   class FileToWordsRestrictionProvider(beam.transforms.core.RestrictionProvider
@@ -1654,7 +1654,10 @@ def sdf_basic_example():
       return OffsetRange(0, os.stat(file_name).st_size)
 
     def create_tracker(self, restriction):
-      return beam.io.restriction_trackers.OffsetRestrictionTracker()
+      return beam.io.restriction_trackers.OffsetRestrictionTracker(restriction)
+    
+    def restriction_size(self, file_name, restriction):
+      return restriction.size()
 
   class FileToWordsFn(beam.DoFn):
     def process(
@@ -1666,7 +1669,7 @@ def sdf_basic_example():
         # the provider.
         tracker=beam.DoFn.RestrictionParam(FileToWordsRestrictionProvider())):
       with open(file_name) as file_handle:
-        file_handle.seek(tracker.current_restriction.start())
+        file_handle.seek(tracker.current_restriction().start)
         while tracker.try_claim(file_handle.tell()):
           yield read_next_record(file_handle)
 
